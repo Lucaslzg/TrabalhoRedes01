@@ -1,75 +1,52 @@
 import socket
 import threading
 
+class TestClient:
+    def __init__(self, host="127.0.0.1", port=12345):
+        self.server_host = host
+        self.server_port = port
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.lock = threading.Lock()
 
-class Client:
-    def __init__(self, client_socket):
-        self.client_socket = client_socket
+    def connect(self):
+        self.client_socket.connect((self.server_host, self.server_port))
+        print(f"[CLIENT] Connected to {self.server_host}:{self.server_port}")
 
-    def sendrequest(self, payload):
-        self.client_socket.send(payload.encode('utf-8'))
-
-    def receiverequest(self):
+    def start(self):
         while True:
-            data = self.client_socket.recv(1024)
-            print(str(data))
-            more = input('Want to send more data to the server? (y/n) ')
-            if more.lower() == 'y':
-                payload = input('Enter Payload: ')
-                send_thread = threading.Thread(target=self.sendrequest, args=(payload,))
-                send_thread.start()
-            else:
+            message = input("[CLIENT] Enter CPF or Name (or type END to quit): ").strip()
+            if not message:
+                continue
+            if message.upper() == "END":
+                self.client_socket.sendall(b"END\n")
+                print("[CLIENT] Disconnected from server.")
                 break
 
+            try:
+                with self.lock:
+                    self.client_socket.sendall((message + "\n").encode("utf-8"))
+                threading.Thread(target=self.receive_response).start()
+            except Exception as e:
+                print(f"[CLIENT] Error sending data: {e}")
+                break
+
+        self.client_socket.close()
+
+    def receive_response(self):
+        try:
+            buffer = ""
+            while True:
+                data = self.client_socket.recv(1024).decode("utf-8")
+                if not data:
+                    break
+                buffer += data
+                if '\n' in buffer:
+                    break
+            print(f"[CLIENT] Response: {buffer.strip()}")
+        except Exception as e:
+            print(f"[CLIENT] Error receiving data: {e}")
 
 if __name__ == '__main__':
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect(('127.0.0.1', 12345))
-
-    client = Client(client_socket)
-    initial_payload = 'Hey Server'
-    thread = threading.Thread(target=client.sendrequest, args=(initial_payload,))
-    thread.start()
-    client.receiverequest()
-
-    client_socket.close()
-
-
-# import socket
-# import multiprocessing
-# import threading
-#
-#
-# class Client:
-#     def __init__(self):
-#         pass
-#
-#     @staticmethod
-#     def sendrequest(client_socket, payload):
-#         client_socket.send(payload.encode('utf-8'))
-#
-#     @staticmethod
-#     def receiverequest(client_socket):
-#         while True:
-#             data = client_socket.recv(1024)
-#             print(str(data))
-#             more = input('Want to send more data to the server? (y/n) ')
-#             if more.lower() == 'y':
-#                 payload = input('Enter Payload: ')
-#                 send_thread = threading.Thread(target=Client.sendrequest, args=(client_socket, payload))
-#                 send_thread.start()
-#             else:
-#                 break
-#
-#
-# if __name__ == '__main__':
-#     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#     client_socket.connect(('127.0.0.1', 12345))
-#     payload = 'Hey Server'
-#     thread = threading.Thread(target=Client.sendrequest, args=(client_socket, payload), )
-#     thread.start()
-#     Client.receiverequest(client_socket)
-#
-#     client_socket.close()
-#
-#
+    client = TestClient()
+    client.connect()
+    client.start()
