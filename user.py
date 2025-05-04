@@ -1,3 +1,5 @@
+import json
+
 class User:
 
     def __init__(self, cpf, nome, sexo, nasc):
@@ -13,3 +15,6 @@ class User:
             'sexo': self.sexo,
             'nasc': self.nasc
         }
+
+    def toJson(self):
+        return (json.dumps(self.toDict()))
