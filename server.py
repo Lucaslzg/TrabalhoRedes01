@@ -1,36 +1,43 @@
+import json
 import os
 import socket
 import sqlite3
 import threading
 from multiprocessing import Process, freeze_support
 
-DB_PATH = "C:/Redes/basecpf.db"
+from response import Response
+from user import User
 
+DB_PATH = "C:/Redes/basecpf.db"
 
 class Server:
     def __init__(self, server_socket):
         self.server_socket = server_socket
 
     def database_access(self, data_received):
-        print("[THREAD] Database Access")
-        print('PID ATUAL (Processo):', os.getpid())
-
+        print("[THREAD] Database Access PID:", os.getpid())
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         cursor = conn.cursor()
+
         if data_received[0].isdigit():
-            query = "SELECT * FROM cpf WHERE cpf = ?"
+            cursor.execute("SELECT * FROM cpf WHERE cpf = ?", (data_received,))
         else:
-            query = "SELECT * FROM cpf WHERE nome = ?"
-        cursor.execute(query, (data_received,))
-        result = cursor.fetchall()
+            cursor.execute("SELECT * FROM cpf WHERE nome = ?", (data_received,))
+
+        rows = cursor.fetchall()
         conn.close()
-        return result
+
+        users = [User(*row) for row in rows]
+
+        response_json = Response(users).toJson()
+        print("[THREAD] JSON →", response_json)
+        return response_json
+
 
     def handle_request(self, client_socket, message):
-        result = self.database_access(message)
+        json_payload = self.database_access(message)
         try:
-            response = str(result) + '\n'
-            client_socket.sendall(response.encode('utf-8'))
+            client_socket.sendall((json_payload + "\n").encode("utf-8"))
         except Exception as e:
             print("[SERVER] Error sending response:", e)
 
@@ -56,7 +63,6 @@ class Server:
             except Exception as e:
                 print(f"[PROCESS] Error with {addr}: {e}")
                 break
-
         client_socket.close()
 
     def connection(self):

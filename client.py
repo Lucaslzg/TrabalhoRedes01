@@ -1,5 +1,6 @@
 import socket
 import threading
+from response import Response
 
 class TestClient:
     def __init__(self, host="localhost", port=12345):
@@ -36,13 +37,14 @@ class TestClient:
         try:
             buffer = ""
             while True:
+
                 data = self.client_socket.recv(1024).decode("utf-8")
                 if not data:
                     break
                 buffer += data
                 if '\n' in buffer:
                     break
-            print(f"[CLIENT] Response: {buffer.strip()}")
+            print(f"\n[CLIENT] Response: {buffer.strip()}")
         except Exception as e:
             print(f"[CLIENT] Error receiving data: {e}")
 
