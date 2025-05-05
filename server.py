@@ -7,10 +7,9 @@ import json
 from multiprocessing import Process, freeze_support
 from PyQt5 import QtCore, QtWidgets
 
-# Caminho fixo para o banco de dados
-DB_PATH = r"C:\Users\LucasZGallert\Documents\Cod\Gersu\basecpf.db"
+# Caminho padrão
+DB_PATH = r"C:/Redes/basecpf.db"
 
-# Dependências externas esperadas
 from response import Response
 from user import User
 
@@ -33,7 +32,6 @@ class Server:
         conn.close()
 
         users = [User(*row) for row in rows]
-
         response_json = Response(users).toJson()
         print("[THREAD] JSON →", response_json)
         return response_json
@@ -75,44 +73,55 @@ class Server:
             try:
                 client_socket, addr = self.server_socket.accept()
                 threading.Thread(target=self.handle_client, args=(client_socket, addr)).start()
+            except OSError as e:
+                print("[MAIN] Socket encerrado. Encerrando conexão.")
+                break
             except Exception as e:
                 print("[MAIN] Error accepting connection:", e)
                 break
 
-
 class Ui_Janela(object):
     def setupUi(self, Janela):
         Janela.setObjectName("Janela")
-        Janela.resize(331, 212)
+        Janela.resize(331, 260)  # Aumentado para acomodar novo campo
         self.centralwidget = QtWidgets.QWidget(Janela)
         self.centralwidget.setObjectName("centralwidget")
+
         self.verticalLayoutWidget = QtWidgets.QWidget(self.centralwidget)
-        self.verticalLayoutWidget.setGeometry(QtCore.QRect(20, 0, 291, 91))
+        self.verticalLayoutWidget.setGeometry(QtCore.QRect(20, 0, 291, 131))  # Ajustado
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
         self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout_2.setSpacing(2)
+
         self.label_2 = QtWidgets.QLabel(self.verticalLayoutWidget)
         self.label_2.setText("IP do Servidor:")
         self.verticalLayout_2.addWidget(self.label_2)
         self.lineEdit = QtWidgets.QLineEdit(self.verticalLayoutWidget)
         self.verticalLayout_2.addWidget(self.lineEdit)
-        self.label = QtWidgets.QLabel(self.verticalLayoutWidget)
-        self.verticalLayout_2.addWidget(self.label)
+
         self.label_3 = QtWidgets.QLabel(self.verticalLayoutWidget)
         self.label_3.setText("Porta:")
         self.verticalLayout_2.addWidget(self.label_3)
         self.lineEdit_2 = QtWidgets.QLineEdit(self.verticalLayoutWidget)
         self.verticalLayout_2.addWidget(self.lineEdit_2)
 
+        # NOVO: Campo para o caminho do banco de dados
+        self.label_db = QtWidgets.QLabel(self.verticalLayoutWidget)
+        self.label_db.setText("Caminho do Banco de Dados:")
+        self.verticalLayout_2.addWidget(self.label_db)
+        self.lineEdit_db_path = QtWidgets.QLineEdit(self.verticalLayoutWidget)
+        self.lineEdit_db_path.setText(DB_PATH)  # seta o caminho do banco de dados padrão
+        self.verticalLayout_2.addWidget(self.lineEdit_db_path)
+
         self.verticalLayoutWidget_2 = QtWidgets.QWidget(self.centralwidget)
-        self.verticalLayoutWidget_2.setGeometry(QtCore.QRect(40, 90, 251, 41))
+        self.verticalLayoutWidget_2.setGeometry(QtCore.QRect(40, 135, 251, 41))
         self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.verticalLayoutWidget_2)
         self.pushButton = QtWidgets.QPushButton(self.verticalLayoutWidget_2)
         self.pushButton.setText("Iniciar/Parar Servidor")
         self.verticalLayout_3.addWidget(self.pushButton)
 
         self.verticalLayoutWidget_3 = QtWidgets.QWidget(self.centralwidget)
-        self.verticalLayoutWidget_3.setGeometry(QtCore.QRect(110, 130, 111, 41))
+        self.verticalLayoutWidget_3.setGeometry(QtCore.QRect(110, 180, 111, 41))
         self.verticalLayout_4 = QtWidgets.QVBoxLayout(self.verticalLayoutWidget_3)
         self.label_4 = QtWidgets.QLabel(self.verticalLayoutWidget_3)
         self.label_4.setAlignment(QtCore.Qt.AlignCenter)
@@ -130,21 +139,40 @@ class Ui_Janela(object):
         self.server_thread = None
 
     def toggle_server(self):
-        if self.server_thread:
+        global DB_PATH
+
+        # se o servidotr estiver rodando, seta ele pra parado, e reseta todas as variaveis
+        if self.server_thread and self.server_thread.is_alive():
             self.label_4.setText("Parado")
             print("[GUI] Servidor encerrado.")
-            # Not safe to close socket here forcibly if thread is still using it
+            try:
+                self.server_socket.close()
+            except Exception as e:
+                print(f"[GUI] Erro ao fechar o socket: {e}")
+            self.server_socket = None
+            self.server_thread = None
             return
+
         try:
+            #
+            db_path_input = self.lineEdit_db_path.text()
+            if db_path_input:
+                DB_PATH = db_path_input
+
             host = self.lineEdit.text() or "0.0.0.0"
             port = int(self.lineEdit_2.text() or 12345)
+
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Ajuda ao reiniciar
             self.server_socket.bind((host, port))
             self.server_socket.listen(1000)
+
             self.server_thread = threading.Thread(target=self.run_server, daemon=True)
             self.server_thread.start()
+
             self.label_4.setText("Rodando")
             print(f"[GUI] Servidor iniciado em {host}:{port}")
+            print(f"[GUI] Usando banco de dados em: {DB_PATH}")
         except Exception as e:
             print(f"[GUI] Erro ao iniciar servidor: {e}")
             self.label_4.setText("Erro")
