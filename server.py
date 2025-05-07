@@ -15,13 +15,14 @@ from user import User
 
 
 class Server:
-    def __init__(self, server_socket):
+    def __init__(self, server_socket, db_path):
         self.server_socket = server_socket
+        self.db_path = db_path
+        self.conn = None  # Armazena a conexão com o banco de dados
 
     def database_access(self, data_received):
         print("[THREAD] Database Access PID:", os.getpid())
-        print(data_received)
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)  # Usa self.db_path
         cursor = conn.cursor()
 
         if data_received[0].isdigit():
@@ -90,6 +91,12 @@ class Server:
                 print("[MAIN] Error accepting connection:", e)
                 break
 
+    def close_connection(self):
+        if self.conn:
+            self.conn.close()
+            print("[SERVER] Conexão com o banco de dados fechada.")
+
+
 class Ui_Janela(object):
     def setupUi(self, Janela):
         Janela.setObjectName("Janela")
@@ -151,33 +158,37 @@ class Ui_Janela(object):
     def toggle_server(self):
         global DB_PATH
 
-        # se o servidotr estiver rodando, seta ele pra parado, e reseta todas as variaveis
+        # Se o servidor estiver rodando, encerra
         if self.server_thread and self.server_thread.is_alive():
             self.label_4.setText("Parado")
             print("[GUI] Servidor encerrado.")
             try:
-                self.server_socket.close()
+                # Fechar o socket e a conexão com o banco de dados
+                if self.server_socket:
+                    self.server_socket.close()
+                if self.server:
+                    self.server.close_connection()  # Se você tiver uma função para fechar a conexão do banco de dados
             except Exception as e:
-                print(f"[GUI] Erro ao fechar o socket: {e}")
+                print(f"[GUI] Erro ao fechar o socket ou a conexão: {e}")
             self.server_socket = None
             self.server_thread = None
             return
 
         try:
-            #
             db_path_input = self.lineEdit_db_path.text()
             if db_path_input:
-                DB_PATH = db_path_input
+                DB_PATH = db_path_input  # Atualiza o DB_PATH com o valor do campo de texto
 
             host = self.lineEdit.text() or "0.0.0.0"
             port = int(self.lineEdit_2.text() or 12345)
 
+            # Recriar o socket e reconfigurar a porta
             self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Ajuda ao reiniciar
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.server_socket.bind((host, port))
             self.server_socket.listen(1000)
 
-            self.server_thread = threading.Thread(target=self.run_server, daemon=True)
+            self.server_thread = threading.Thread(target=self.run_server, args=(DB_PATH,), daemon=True)
             self.server_thread.start()
 
             self.label_4.setText("Rodando")
@@ -187,10 +198,10 @@ class Ui_Janela(object):
             print(f"[GUI] Erro ao iniciar servidor: {e}")
             self.label_4.setText("Erro")
 
-    def run_server(self):
+    def run_server(self, db_path):
         freeze_support()
-        server = Server(self.server_socket)
-        server.connection()
+        self.server = Server(self.server_socket, db_path)  # Passando db_path como parâmetro para o servidor
+        self.server.connection()
 
 
 if __name__ == "__main__":

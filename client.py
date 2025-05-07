@@ -38,9 +38,9 @@ class TestClient(QtCore.QObject):
         if not self.running or not message.strip():
             return
         try:
-            # Empacotar a consulta (CPF ou Nome) em um JSON
-            message_dict = {"query": message.strip()}  # A chave "query" contém o valor enviado
-            message_json = json.dumps(message_dict)  # Converte o dicionário para JSON
+            # empacota como dicionario, e transforma para json para que seja enviado
+            message_dict = {"query": message.strip()}
+            message_json = json.dumps(message_dict)
 
             with self.lock:
                 # Envia o JSON no formato UTF-8
