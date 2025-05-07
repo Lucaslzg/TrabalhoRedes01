@@ -20,6 +20,7 @@ class Server:
 
     def database_access(self, data_received):
         print("[THREAD] Database Access PID:", os.getpid())
+        print(data_received)
         conn = sqlite3.connect(DB_PATH, check_same_thread=False)
         cursor = conn.cursor()
 
@@ -37,11 +38,20 @@ class Server:
         return response_json
 
     def handle_request(self, client_socket, message):
-        json_payload = self.database_access(message)
         try:
-            client_socket.sendall((json_payload + "\n").encode("utf-8"))
+            # Converte a mensagem recebida de JSON para dicionário
+            message_dict = json.loads(message.strip())  # Converte o JSON em um dicionário
+            query = message_dict.get("query", "").strip()  # Obtém o valor da chave "query"
+
+            if query:
+                # Chama o metodo de acesso ao banco para buscar o CPF ou Nome
+                json_payload = self.database_access(query)
+                client_socket.sendall((json_payload + "\n").encode("utf-8"))
+            else:
+                client_socket.sendall(b"Erro: Nenhuma consulta fornecida.\n")
         except Exception as e:
-            print("[SERVER] Error sending response:", e)
+            print(f"[SERVER] Erro ao processar a requisição: {e}")
+            client_socket.sendall(b"Erro ao processar a requisicao.\n")
 
     def handle_client(self, client_socket, addr):
         print(f"[PROCESS] Handling client from {addr} (PID: {os.getpid()})")

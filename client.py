@@ -2,6 +2,7 @@ import sys
 import socket
 import threading
 from PyQt5 import QtCore, QtGui, QtWidgets
+import json
 
 class TestClient(QtCore.QObject):
     received = QtCore.pyqtSignal(str)
@@ -37,8 +38,14 @@ class TestClient(QtCore.QObject):
         if not self.running or not message.strip():
             return
         try:
+            # Empacotar a consulta (CPF ou Nome) em um JSON
+            message_dict = {"query": message.strip()}  # A chave "query" contém o valor enviado
+            message_json = json.dumps(message_dict)  # Converte o dicionário para JSON
+
             with self.lock:
-                self.client_socket.sendall((message.strip() + "\n").encode("utf-8"))
+                # Envia o JSON no formato UTF-8
+                self.client_socket.sendall((message_json + "\n").encode("utf-8"))
+
             threading.Thread(target=self.receive_response, daemon=True).start()
         except Exception as e:
             self.received.emit(f"Erro ao enviar: {e}")
