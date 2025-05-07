@@ -26,7 +26,7 @@ class Server:
         if data_received[0].isdigit():
             cursor.execute("SELECT * FROM cpf WHERE cpf = ?", (data_received,))
         else:
-            cursor.execute("SELECT * FROM cpf WHERE nome = ?", (data_received,))
+            cursor.execute("SELECT * FROM cpf WHERE nome LIKE ? LIMIT 1000", ('%' + data_received.upper() + '%',))
 
         rows = cursor.fetchall()
         conn.close()
